@@ -19,10 +19,11 @@ func Get(r Request) (body []byte, err error) {
 	if resp, err = http.Get(r.Url); err != nil {
 		return
 	}
-	defer resp.Body.Close()
+	//defer resp.Body.Close()
 	if body, err = ioutil.ReadAll(resp.Body); err != nil {
 		return
 	}
+	resp.Body.Close()
 	return body, err
 }
 

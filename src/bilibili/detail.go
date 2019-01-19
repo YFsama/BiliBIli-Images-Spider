@@ -2,7 +2,6 @@ package bilibili
 
 import (
 	"encoding/json"
-	"fmt"
 	"github.com/yranarf/BiliBIli-Images-Spider/src/common"
 )
 
@@ -45,25 +44,25 @@ type ApiDetailPictures struct {
 }
 
 func detailSpider(r common.Request) {
+
 	var (
 		body          []byte
 		err           error
 		apiDetailResp ApiDetailResponse
 	)
-
 	if body, err = common.Get(r); err != nil {
-		return
+		goto END
 	}
 
 	if err = json.Unmarshal(body, &apiDetailResp); err != nil {
-		return
+		goto END
 	}
-
-	fmt.Println(apiDetailResp.Data.Item.Title)
 
 	if apiDetailResp.Code == 0 && apiDetailResp.Msg == "success" {
 		detailDownload(apiDetailResp.Data)
-	} else {
-		return
+		detailOk <-0
 	}
+	//time.Sleep(50 * time.Millisecond)
+	END:
+		detailOk <-0
 }

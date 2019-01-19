@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"github.com/yranarf/BiliBIli-Images-Spider/src/common"
 	"strconv"
+	"time"
 )
 
 type ApiListResponse struct {
@@ -46,6 +47,11 @@ type ApiListUser struct {
 	Name    string `json:"name"`
 }
 
+var listOk chan int
+var downOk chan int
+var docListOk chan int
+var detailOk chan int
+
 func indexSpider(area string) (err error) {
 	var (
 		body       []byte
@@ -54,35 +60,47 @@ func indexSpider(area string) (err error) {
 		request    common.Request
 		requestUrl string
 		url        string
+		quitI      int
 	)
+
+	listOk = make(chan int)
 	url = "https://api.vc.bilibili.com/link_draw/v2/" + area + "/list"
 	//0~24
-	func() {
-		for i = 0; i <= 1; i++ {
+	for i = 0; i <= 24; i++ {
+		//time.Sleep(50 * time.Millisecond)
+		go func(i int) {
 			requestUrl = url + "?category=cos&type=hot&page_num=" + strconv.Itoa(i) + "&page_size=20"
-
+			//fmt.Println(requestUrl)
 			request = common.Request{
 				Url: requestUrl,
 			}
 			if body, err = common.Get(request); err != nil {
-				continue
+				goto END
 			}
 
 			if err = json.Unmarshal(body, &apiResp); err != nil {
-				continue
+				goto END
 			}
 
 			if apiResp.Code == 0 && apiResp.Msg == "success" {
 				apiListResponse(apiResp)
-			} else {
-				continue
+				listOk <- 0
+
 			}
-		}
+		END:
+			listOk <- 0
+		}(i)
+	}
 
-	}()
+	for quitI = 0; quitI <= 1; quitI++ {
+		<-listOk
+	}
 
+	err = nil
 	return
 }
+
+
 
 func apiListResponse(resp ApiListResponse) {
 	var (
@@ -91,18 +109,33 @@ func apiListResponse(resp ApiListResponse) {
 		detailUrl string
 		items     ApiListItems
 		doc       int
+		quitI     int
 	)
 	docList = make([]int, 0)
 	for _, items = range resp.Data.Items {
 		docList = append(docList, items.Item.DocId)
 	}
-	//fmt.Println(items.Item.Title)
-	for _, doc = range docList {
-		detailUrl = "https://api.vc.bilibili.com/link_draw/v1/doc/detail?doc_id=" + strconv.Itoa(doc)
-		request = common.Request{
-			Url: detailUrl,
-		}
-		 detailSpider(request)
+
+	docListOk = make(chan int)
+	detailOk = make(chan int)
+	for _,doc = range docList{
+		go func(doc int) {
+			detailUrl = "https://api.vc.bilibili.com/link_draw/v1/doc/detail?doc_id=" + strconv.Itoa(doc)
+			//fmt.Println(doc)
+			request = common.Request{
+				Url: detailUrl,
+			}
+			go detailSpider(request)
+			docListOk <- 0
+		}(doc)
 	}
 
+	for quitI = 0; quitI <= len(docList); quitI++ {
+		<-docListOk
+	}
+	for range docList{
+		<-detailOk
+	}
+time.Sleep(3 * time.Second)
+	return
 }

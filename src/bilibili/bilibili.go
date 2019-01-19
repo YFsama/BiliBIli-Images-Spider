@@ -49,21 +49,48 @@ func detailDownload(data ApiDetailData) {
 		err      error
 		filename string
 		i        int
+		status   bool
 		pictures ApiDetailPictures
+		username string
+		title    string
+		src      string
 	)
-	if err = common.CreateDir([]string{"images/" + data.User.Name}); err != nil {
-		return
-	}
-	for i = 0; i >= len(data.Item.Pictures); i ++ {
+	downOk = make(chan int)
+	fmt.Println(data.User.Name + "-" + data.Item.Title + "-" + strconv.Itoa(len(data.Item.Pictures)))
+	go func() {
+		i = 0
+		for _, pictures = range data.Item.Pictures {
+			username = data.User.Name
+			title = data.Item.Title
+			src = pictures.ImgSrc
 
-	}
-	i = 0
-	for _, pictures = range data.Item.Pictures {
-		filename = "images/"+ data.User.Name + "/" + data.Item.Title + "-" + strconv.Itoa(i) + ".jpg"
-		if err = download(filename, pictures.ImgSrc); err != nil {
-			return
+			go func(userName string, title string, src string,i int) {
+				if err = common.CreateDir([]string{"images/" + userName}); err != nil {
+					goto END
+				}
+
+				filename = "images/" + userName + "/" + title + "-" + strconv.Itoa(i) + ".jpg"
+				i++
+				fmt.Println(filename)
+				if status, err = common.PathExists(filename); err != nil {
+					goto END
+				}
+				if !status {
+					if err = download(filename, src); err != nil {
+						goto END
+					}
+					downOk <- 0
+				}
+			END:
+				downOk <- 0
+			}(username, title, src,i)
+			i++
 		}
-		i++
+	}()
+
+	for range data.Item.Pictures {
+		//fmt.Println(data.Item.Title)
+		<-downOk
 	}
 
 }
